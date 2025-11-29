@@ -9,32 +9,14 @@ from openai import OpenAI
 from rich.console import Console
 
 from pyday2025_llm.constants import MODEL_NAME
-from pyday2025_llm.tools import GrepPatternParams
-from pyday2025_llm.tools import GrepPatternParamsDefinition
-from pyday2025_llm.tools import ListFilesParams
-from pyday2025_llm.tools import ListFilesToolDefinition
-from pyday2025_llm.tools import ReadFileParams
-from pyday2025_llm.tools import ReadFileToolDefinition
-from pyday2025_llm.tools import grep_pattern
-from pyday2025_llm.tools import list_files
-from pyday2025_llm.tools import read_file
-
-# from pyday2025_llm.tools import list_files
+from pyday2025_llm.tools_v2 import GrepPatternTool
+from pyday2025_llm.tools_v2 import ListFilesTool
+from pyday2025_llm.tools_v2 import ReadFileTool
+from pyday2025_llm.tools_v2 import grep_pattern
+from pyday2025_llm.tools_v2 import list_files
+from pyday2025_llm.tools_v2 import read_file
 
 Conversation: TypeAlias = list[dict]
-
-"""
-TASKS:
-
-- Call single LLM turn
-- Add tools to Agent class
-- Check how to send tool info to OpenAI chat completions
-- Improve SYSTEM_PROMPT
-- Add call_tool method
-- Add --debug flag to CLI and implement conversation saving
-- Add --user-input CLI flag
-
-"""
 
 
 def get_openai_key() -> str:
@@ -60,46 +42,47 @@ class Agent:
     def __init__(
         self,
         client: OpenAI,
+        model_name: str = MODEL_NAME,
         max_loops: int = 50,
-        base_path: Path | None = None,
         tools: list[dict] | None = None,
+        base_path: Path | None = None,
+        debug: bool = False,
     ):
         self.client = client
-        self.model_name = MODEL_NAME
+        self.model_name = model_name
         self.max_loops = max_loops
         self.conversation_history: Conversation = []
+        self.tools = tools or []
         self.base_path = base_path or Path("data")
         self.base_path_abs = self.base_path.resolve()
+        self.debug = debug
         self.console = Console()
-        self.tools = tools or []
 
         self.SYSTEM_PROMPT = f"""You are a helpful assistant.
 
-You have access to tools to list files.
+You have access to tools to list files, read files, and search for patterns.
 
 You base path is set to: {self.base_path_abs}, all the function calls MUST use paths relative to this base path, never use absolute paths.
 For example, to list the folder f{self.base_path / "some_folder"}, you must only pass "some_folder" as the folder argument.
-
-If the user asks for references of files, return them in the following format:
-
-[file_name][line_start-line_end]
 """
 
-    # TASK: Add validation to call_tool
-
-    def call_tool(self, tool_name: str, parameters: dict) -> Any:
-        validated_params: Any
-        if tool_name == "list_files":
-            validated_params = ListFilesParams.model_validate(parameters)
-            result = list_files(Path(validated_params.folder))
-        elif tool_name == "read_file":
-            validated_params = ReadFileParams.model_validate(parameters)
-            result = read_file(Path(validated_params.file_path))
-        elif tool_name == "grep_pattern":
-            validated_params = GrepPatternParams.model_validate(parameters)
-            result = grep_pattern(validated_params.pattern)
+    def call_tool(self, name: str, arguments: dict) -> str:
+        """Execute a tool and return its result."""
+        if name == "list_files":
+            folder = self.base_path / arguments["folder"]
+            result = list_files(folder)
+        elif name == "read_file":
+            file_path = self.base_path / arguments["file_path"]
+            result = read_file(
+                file_path,
+                arguments.get("line_start"),
+                arguments.get("line_end"),
+            )
+        elif name == "grep_pattern":
+            base_path = self.base_path / arguments["base_path"]
+            result = grep_pattern(base_path, arguments["pattern"])
         else:
-            return "Unknown tool"
+            return f"Unknown tool: {name}"
 
         if result.status_code != 0:
             return f"Error: {result.error_message}"
@@ -110,9 +93,14 @@ If the user asks for references of files, return them in the following format:
             model=self.model_name,
             messages=self.conversation_history,  # type: ignore
             tools=[{"type": "function", "function": t} for t in self.tools],  # type: ignore
-            # TODO: add "tools" parameter
         )
         return response
+
+    def save_conversation(self):
+        """Save conversation to conversation.json if debug mode is enabled."""
+        if self.debug:
+            with open("conversation.json", "w") as f:
+                json.dump(self.conversation_history, f, indent=2)
 
     def run(self, user_input: str | None = None):
         # Initialize conversation with system prompt if starting fresh
@@ -124,7 +112,8 @@ If the user asks for references of files, return them in the following format:
         # Add user input if provided
         if user_input:
             self.conversation_history.append({"role": "user", "content": user_input})
-            # self.save_conversation()
+            # self.console.print(f"\n[blue]You[/blue]: {user_input}")
+            self.save_conversation()
 
         current_loop = 0
 
@@ -133,7 +122,10 @@ If the user asks for references of files, return them in the following format:
 
             response = self.one_turn()
             message = response.choices[0].message
+
+            # Append assistant message to conversation
             self.conversation_history.append(message.model_dump())
+            self.save_conversation()
 
             # Print assistant text response if present
             if message.content:
@@ -160,10 +152,12 @@ If the user asks for references of files, return them in the following format:
                             "content": result,
                         }
                     )
+                    self.save_conversation()
             else:
                 # No tool calls, model has finished this turn
                 return message.content
 
+        print("Max loops reached, stopping.")
         return self.conversation_history[-1].get("content", "")
 
 
@@ -174,26 +168,41 @@ def main() -> int:
     openai_api_key = get_openai_key()
     client = OpenAI(api_key=openai_api_key)
     max_loops = args.max_loops
+    model_name = args.model_name
     base_path = Path(args.base_path)
+    debug = args.debug
+
+    tools = [ListFilesTool, ReadFileTool, GrepPatternTool]
 
     agent = Agent(
         client=client,
+        model_name=model_name,
         max_loops=max_loops,
+        tools=tools,
         base_path=base_path,
-        tools=[
-            ListFilesToolDefinition,
-            ReadFileToolDefinition,
-            GrepPatternParamsDefinition,
-        ],
+        debug=debug,
     )
 
     console = Console()
     console.print("Chat with the agent (use 'ctrl-c' to quit)")
 
-    user_input = console.input("\n[blue]You[/blue]: ")
-    if not user_input.strip():
-        console.print("No input provided.")
-    return agent.run(user_input)
+    # If user input provided via CLI, run once and exit
+    if args.user_input:
+        agent.run(args.user_input)
+        return 0
+
+    # Multi-turn conversation loop
+    while True:
+        try:
+            user_input = console.input("\n[blue]You[/blue]: ")
+            if not user_input.strip():
+                continue
+            agent.run(user_input)
+        except (KeyboardInterrupt, EOFError):
+            console.print("\nGoodbye!")
+            break
+
+    return 0
 
 
 def parse_args() -> argparse.Namespace:
@@ -207,6 +216,12 @@ def parse_args() -> argparse.Namespace:
         help="Maximum number of search iterations. Default: %(default)s",
     )
     parser.add_argument(
+        "--model-name",
+        type=str,
+        default=MODEL_NAME,
+        help="OpenAI model name to use. Default: %(default)s",
+    )
+    parser.add_argument(
         "--base-path",
         type=str,
         default="data",
@@ -218,9 +233,10 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="User input to start with. If not provided, will prompt interactively.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode. Saves conversation to conversation.json after each turn.",
+    )
 
     return parser.parse_args()
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
