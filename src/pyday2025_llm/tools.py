@@ -126,6 +126,49 @@ def read_file(file_path: Path) -> ToolResult:
 
 # TODO (3): Implement grep_pattern tool
 
+
+class GrepPatternParams(BaseModel):
+    pattern: str
+
+
+GrepPatternParamsDefinition = pydantic_to_tool_params(
+    name="grep_pattern",
+    description="Search for a pattern in all text files under a base path.",
+    parameters_model=GrepPatternParams,
+)
+
+
+def grep_pattern(pattern: str) -> ToolResult:
+    """Search for a pattern in all text files under a base path."""
+    try:
+        compiled_pattern = re.compile(pattern)
+    except Exception:
+        return ToolResult(
+            status_code=1,
+            output="",
+            error_message=f"Invalid regex pattern: {pattern}",
+        )
+
+    matches = []
+    for file_path in Path(".").rglob("*.txt"):
+        try:
+            with file_path.open("r") as f:
+                for line_number, line in enumerate(f, start=1):
+                    if compiled_pattern.search(line):
+                        matches.append(f"{file_path}:{line_number}:{line.strip()}")
+        except Exception as e:
+            return ToolResult(
+                status_code=2,
+                output="",
+                error_message=f"Error reading file {file_path}: {str(e)}",
+            )
+
+    return ToolResult(
+        status_code=0,
+        output=json.dumps(matches),
+    )
+
+
 # TODO (4): Add glob import to grep_pattern tool
 
 # TODO (5): Add ask_user tool

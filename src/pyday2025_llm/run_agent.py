@@ -9,10 +9,13 @@ from openai import OpenAI
 from rich.console import Console
 
 from pyday2025_llm.constants import MODEL_NAME
+from pyday2025_llm.tools import GrepPatternParams
+from pyday2025_llm.tools import GrepPatternParamsDefinition
 from pyday2025_llm.tools import ListFilesParams
 from pyday2025_llm.tools import ListFilesToolDefinition
 from pyday2025_llm.tools import ReadFileParams
 from pyday2025_llm.tools import ReadFileToolDefinition
+from pyday2025_llm.tools import grep_pattern
 from pyday2025_llm.tools import list_files
 from pyday2025_llm.tools import read_file
 
@@ -76,6 +79,10 @@ You have access to tools to list files.
 
 You base path is set to: {self.base_path_abs}, all the function calls MUST use paths relative to this base path, never use absolute paths.
 For example, to list the folder f{self.base_path / "some_folder"}, you must only pass "some_folder" as the folder argument.
+
+If the user asks for references of files, return them in the following format:
+
+[file_name][line_start-line_end]
 """
 
     # TASK: Add validation to call_tool
@@ -88,6 +95,9 @@ For example, to list the folder f{self.base_path / "some_folder"}, you must only
         elif tool_name == "read_file":
             validated_params = ReadFileParams.model_validate(parameters)
             result = read_file(Path(validated_params.file_path))
+        elif tool_name == "grep_pattern":
+            validated_params = GrepPatternParams.model_validate(parameters)
+            result = grep_pattern(validated_params.pattern)
         else:
             return "Unknown tool"
 
@@ -170,7 +180,11 @@ def main() -> int:
         client=client,
         max_loops=max_loops,
         base_path=base_path,
-        tools=[ListFilesToolDefinition, ReadFileToolDefinition],
+        tools=[
+            ListFilesToolDefinition,
+            ReadFileToolDefinition,
+            GrepPatternParamsDefinition,
+        ],
     )
 
     console = Console()
