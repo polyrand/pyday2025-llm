@@ -8,7 +8,9 @@ from openai import OpenAI
 from rich.console import Console
 
 from pyday2025_llm.constants import MODEL_NAME
+from pyday2025_llm.tools import ListFilesParams
 from pyday2025_llm.tools import ListFilesToolDefinition
+from pyday2025_llm.tools import list_files
 
 # from pyday2025_llm.tools import list_files
 
@@ -73,6 +75,8 @@ class Agent:
     def call_tool(self, tool_name: str, parameters: dict) -> Any:
         ...
         if tool_name == ...:
+            validated_params = ListFilesParams.model_validate(parameters)
+            result = list_files(validated_params.folder)
             ...
         else:
             return "Unknown tool"
