@@ -7,15 +7,12 @@ authors = [
     { name = "polyrand", email = "37962604+polyrand@users.noreply.github.com" },
 ]
 requires-python = ">=3.12"
-dependencies = [
-    "openai",
-    "pydantic",
-    "rich>=14.2.0",
-]
+dependencies = ["openai", "pydantic", "rich>=14.2.0"]
 
 [project.scripts]
 pyday2025-llm = "pyday2025_llm:main"
 agent = "pyday2025_llm.run_agent:main"
+debug = "pyday2025_llm.tools:main"
 
 [build-system]
 requires = ["uv_build>=0.9.9,<0.10.0"]

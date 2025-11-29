@@ -8,6 +8,7 @@ from openai import OpenAI
 from rich.console import Console
 
 from pyday2025_llm.constants import MODEL_NAME
+from pyday2025_llm.tools import ListFilesToolDefinition
 
 # from pyday2025_llm.tools import list_files
 
@@ -52,6 +53,7 @@ class Agent:
         client: OpenAI,
         max_loops: int = 50,
         base_path: Path | None = None,
+        tools: list[dict] | None = None,
     ):
         self.client = client
         self.model_name = MODEL_NAME
@@ -60,6 +62,7 @@ class Agent:
         self.base_path = base_path or Path("data")
         self.base_path_abs = self.base_path.resolve()
         self.console = Console()
+        self.tools = tools or []
 
         self.SYSTEM_PROMPT = """You are a helpful assistant.
 """.strip()
@@ -71,6 +74,7 @@ class Agent:
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=self.conversation_history,  # type: ignore
+            # TODO: add "tools" parameter
         )
         return response
 
@@ -142,3 +146,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

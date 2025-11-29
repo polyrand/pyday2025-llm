@@ -54,6 +54,24 @@ def pydantic_to_tool_params(
     }
 
 
+# TASK 1: Implement list_files tools parameters model
+class ListFilesParams(BaseModel):
+    folder: Path
+
+
+ListFilesToolDefinition = pydantic_to_tool_params(
+    name="list_files",
+    description="List top-level files in a folder (non-recursive). ",
+    parameters_model=ListFilesParams,
+)
+
+
+# def main():
+#     from rich.pretty import pprint
+
+#     pprint(ListFilesToolDefinition)
+
+
 def list_files(folder: Path) -> ToolResult:
     """List top-level files in a folder (non-recursive)."""
     try:
