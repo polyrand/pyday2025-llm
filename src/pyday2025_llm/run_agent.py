@@ -70,6 +70,13 @@ class Agent:
     # TASK: Add call_tool
     # TASK: Add validation to call_tool
 
+    def call_tool(self, tool_name: str, parameters: dict) -> Any:
+        ...
+        if tool_name == ...:
+            ...
+        else:
+            return "Unknown tool"
+
     def one_turn(self) -> Any:
         response = self.client.chat.completions.create(
             model=self.model_name,
@@ -78,8 +85,6 @@ class Agent:
             # TODO: add "tools" parameter
         )
         return response
-
-    # TASK: Add conversation saving with --debug flag
 
     def run(self, user_input: str | None = None):
         # Initialize conversation with system prompt if starting fresh
