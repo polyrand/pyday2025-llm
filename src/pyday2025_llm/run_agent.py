@@ -74,6 +74,7 @@ class Agent:
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=self.conversation_history,  # type: ignore
+            tools=[{"type": "function", "function": t} for t in self.tools],  # type: ignore
             # TODO: add "tools" parameter
         )
         return response
