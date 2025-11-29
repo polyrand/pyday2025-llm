@@ -9,12 +9,12 @@ from openai import OpenAI
 from rich.console import Console
 
 from pyday2025_llm.constants import MODEL_NAME
-from pyday2025_llm.tools_v2 import GrepPatternTool
-from pyday2025_llm.tools_v2 import ListFilesTool
-from pyday2025_llm.tools_v2 import ReadFileTool
-from pyday2025_llm.tools_v2 import grep_pattern
-from pyday2025_llm.tools_v2 import list_files
-from pyday2025_llm.tools_v2 import read_file
+from pyday2025_llm.tools import GrepPatternTool
+from pyday2025_llm.tools import ListFilesTool
+from pyday2025_llm.tools import ReadFileTool
+from pyday2025_llm.tools import grep_pattern
+from pyday2025_llm.tools import list_files
+from pyday2025_llm.tools import read_file
 
 Conversation: TypeAlias = list[dict]
 
