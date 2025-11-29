@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -74,7 +75,7 @@ class Agent:
     def call_tool(self, tool_name: str, parameters: dict) -> Any:
         if tool_name == "list_files":
             validated_params = ListFilesParams.model_validate(parameters)
-            result = list_files(validated_params.folder)
+            result = list_files(Path(validated_params.folder))
         else:
             return "Unknown tool"
 
@@ -103,9 +104,44 @@ class Agent:
             self.conversation_history.append({"role": "user", "content": user_input})
             # self.save_conversation()
 
-        response = self.one_turn()
-        message = response.choices[0].message
-        self.conversation_history.append(message.model_dump())
+        current_loop = 0
+
+        while current_loop < self.max_loops:
+            current_loop += 1
+
+            response = self.one_turn()
+            message = response.choices[0].message
+            self.conversation_history.append(message.model_dump())
+
+            # Print assistant text response if present
+            if message.content:
+                self.console.print(f"\n[yellow]Assistant[/yellow]: {message.content}")
+
+            # Check if the model wants to call tools
+            if message.tool_calls:
+                for tool_call in message.tool_calls:
+                    name = tool_call.function.name
+                    arguments = json.loads(tool_call.function.arguments)
+                    self.console.print(
+                        f"\n    [green]tool[/green]: {name}({json.dumps(arguments)})"
+                    )
+
+                    result = self.call_tool(name, arguments)
+                    truncated = result[:200] + "..." if len(result) > 200 else result
+                    self.console.print(f"        [dim]result[/dim]: {truncated}")
+
+                    # Append tool result to conversation
+                    self.conversation_history.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": result,
+                        }
+                    )
+            else:
+                # No tool calls, model has finished this turn
+                return message.content
+
         return self.conversation_history[-1].get("content", "")
 
 

@@ -56,7 +56,7 @@ def pydantic_to_tool_params(
 
 # TASK 1: Implement list_files tools parameters model
 class ListFilesParams(BaseModel):
-    folder: Path
+    folder: str
 
 
 ListFilesToolDefinition = pydantic_to_tool_params(
